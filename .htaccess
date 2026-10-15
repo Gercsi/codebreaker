@@ -1,0 +1,6 @@
+# Do not expose TypeScript sources, session hashes, SQLite or .env through Apache.
+Options -Indexes
+<FilesMatch "^(?!index[.]php$).+">
+  Require all denied
+</FilesMatch>
+DirectoryIndex index.php

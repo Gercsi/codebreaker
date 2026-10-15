@@ -1,0 +1,20 @@
+services:
+  codebreaker:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      NODE_ENV: production
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001}
+      RECONNECT_SECONDS: ${RECONNECT_SECONDS:-120}
+      ROOM_TTL_HOURS: ${ROOM_TTL_HOURS:-24}
+    volumes:
+      - codebreaker-data:/app/data
+    mem_limit: 512m
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  codebreaker-data:
