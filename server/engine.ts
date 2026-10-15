@@ -1,6 +1,6 @@
 import { randomBytes, randomInt, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { DIFFICULTIES, type Settings, type Guess, type RoomView, type Session, type Status } from '../shared/protocol.js';
-import { evaluate, validateCode } from './scoring.js';
+import { evaluate, evaluateDetailed, validateCode } from './scoring.js';
 export interface Player {id:string; nickname:string; tokenHash:string; connected:boolean; disconnectedAt:number|null; secret:number[]|null; guesses:Guess[]; rematch:boolean}
 export interface Room {code:string;gameId:string;hostId:string;status:Status;settings:Settings;round:number;players:Player[];winnerId:string|null;resultType:RoomView['resultType'];createdAt:number;expiresAt:number}
 const hash=(token:string)=>createHash('sha256').update(token).digest('hex');
@@ -21,7 +21,7 @@ export class Engine {
   if(this.rooms.size>=500) throw new Error('A szerver jelenleg megtelt. Próbáld később!');
   const {token,player}=this.newPlayer(name);const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code='';
   do{code=Array.from({length:6},()=>alphabet[randomInt(alphabet.length)]).join('');}while(this.rooms.has(code));
-  const r:Room={code,gameId:randomUUID(),hostId:player.id,status:'WAITING',settings:{difficulty:'normal',repeats:true,maxAttempts:10},round:1,players:[player],winnerId:null,resultType:null,createdAt:this.now(),expiresAt:this.now()+this.ttl};
+  const r:Room={code,gameId:randomUUID(),hostId:player.id,status:'WAITING',settings:{difficulty:'normal',repeats:true,maxAttempts:10,helper:false},round:1,players:[player],winnerId:null,resultType:null,createdAt:this.now(),expiresAt:this.now()+this.ttl};
   this.save(r);this.rooms.set(code,r);return {room:r,session:{roomCode:code,playerId:player.id,token}};
  }
  join(code:unknown,name:unknown){
@@ -39,8 +39,8 @@ export class Engine {
  }
  configure(code:string,id:string,input:Settings){return this.edit(code,r=>{
   this.player(r,id);if(r.status!=='WAITING'||r.hostId!==id) throw new Error('Csak a házigazda módosíthatja a beállításokat, indulás előtt.');
-  if(!input||!Object.hasOwn(DIFFICULTIES,input.difficulty)||typeof input.repeats!=='boolean'||!Number.isInteger(input.maxAttempts)||input.maxAttempts<1||input.maxAttempts>20) throw new Error('Érvénytelen játékbeállítás.');
-  r.settings={difficulty:input.difficulty,repeats:input.repeats,maxAttempts:input.maxAttempts};
+  if(!input||!Object.hasOwn(DIFFICULTIES,input.difficulty)||typeof input.repeats!=='boolean'||(input.helper!==undefined&&typeof input.helper!=='boolean')||!Number.isInteger(input.maxAttempts)||input.maxAttempts<1||input.maxAttempts>20) throw new Error('Érvénytelen játékbeállítás.');
+  r.settings={difficulty:input.difficulty,repeats:input.repeats,maxAttempts:input.maxAttempts,helper:input.helper??false};
  });}
  start(code:string,id:string){return this.edit(code,r=>{if(r.hostId!==id||r.status!=='WAITING') throw new Error('A játékot a házigazda indíthatja.');if(r.players.length!==2||r.players.some(p=>!p.connected)) throw new Error('Az induláshoz két online játékos szükséges.');r.status='SETUP';});}
  secret(code:string,id:string,gameId:unknown,colors:unknown){return this.edit(code,r=>{
@@ -52,7 +52,7 @@ export class Engine {
   if(r.players.some(p=>!p.connected)) throw new Error('Várjuk meg, amíg az ellenfél visszacsatlakozik.');
   if(p.guesses.some(g=>g.round===r.round)) throw new Error('Ebben a körben már tippeltél.');
   validateCode(colors,r.settings);const opponent=r.players.find(p=>p.id!==id)!;
-  p.guesses.push({round:r.round,colors:[...colors],...evaluate(opponent.secret!,colors)});
+  p.guesses.push({round:r.round,colors:[...colors],...(r.settings.helper?evaluateDetailed(opponent.secret!,colors):evaluate(opponent.secret!,colors))});
   if(r.players.every(p=>p.guesses.some(g=>g.round===r.round))){
    const winners=r.players.filter(p=>p.guesses.at(-1)!.exact===DIFFICULTIES[r.settings.difficulty].length);
    if(winners.length||r.round>=r.settings.maxAttempts){r.status='FINISHED';r.winnerId=winners.length===1?winners[0].id:null;r.resultType=winners.length?'solved':'exhausted';}
@@ -81,7 +81,7 @@ export class Engine {
   }));
  }return changed;}
  view(r:Room,id:string):RoomView {
-  const me=this.player(r,id);return {code:r.code,gameId:r.gameId,hostId:r.hostId,meId:id,status:r.status,settings:{...r.settings},round:r.round,
+  const me=this.player(r,id);return {code:r.code,gameId:r.gameId,hostId:r.hostId,meId:id,status:r.status,settings:{...r.settings,helper:r.settings.helper??false},round:r.round,
    players:r.players.map(p=>({id:p.id,nickname:p.nickname,connected:p.connected,ready:!!p.secret,submitted:p.guesses.some(g=>g.round===r.round),rematch:p.rematch,reconnectUntil:p.disconnectedAt===null?null:p.disconnectedAt+this.grace})),
    guesses:structuredClone(me.guesses),ownSecret:me.secret?[...me.secret]:null,winnerId:r.winnerId,resultType:r.resultType,expiresAt:r.expiresAt,
    reveal:r.status==='FINISHED'?r.players.map(p=>({id:p.id,secret:p.secret?[...p.secret]:null,guesses:structuredClone(p.guesses)})):null};

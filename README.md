@@ -36,6 +36,7 @@ Az E2E-csomag helyben a telepített Microsoft Edge-et használja. Chrome-hoz Pow
 
 - Maximum két játékos, 20 karakteres becenév, kriptográfiailag véletlen hatkarakteres szobakód, meghívólink.
 - Könnyű (4/6), normál (5/8), nehéz (6/8) fokozat; színismétlés kapcsolható; 5/8/10/12/15/20 próbálkozás a felületen. A motor 1–20 próbálkozást támogat.
+- Választható segítő mód (alapból kikapcsolva): pozíciónkénti ✓ / ↔ / × visszajelzés, a megtalált helyek automatikus kitöltése és zárolása, a még elhelyezendő biztos színek kiemelése. A házigazda indulás előtt mindkét félnek együtt kapcsolja. Ismétlésnél a × többletpéldányt is jelenthet; a paletta csak ténylegesen kizárt színre írja, hogy „Nincs benne”. Frissítés után visszaáll, visszavágónál a beállítás megmarad, a nyomok törlődnek.
 - Zárolt titkos kódok, azonnali saját értékelés, szinkronizált körök. Az ellenfél csak jelenléti és beküldési státuszt lát.
 - Azonos körben történő megfejtés döntetlen. Egy megfejtés győzelem; a tippkeret kétoldali kimerítése döntetlen.
 - 120 másodperces visszacsatlakozás, állapotmentés SQLite-ba, szerver-újraindítás utáni helyreállítás. Aktív játékban kapcsolatvesztéskor a tippelés szünetel. A határidő után feladás; ha egyik játékos sincs jelen, döntetlen.
@@ -66,7 +67,7 @@ Minden kliensművelet acknowledgement választ kap: `{ok:true,session?}` vagy `{
 | `room:create` | `{nickname}` |
 | `room:join` | `{nickname,code}` |
 | `room:leave`, `game:start`, `game:rematch-request` | `{}` |
-| `game:configure` | `{difficulty,repeats,maxAttempts}` |
+| `game:configure` | `{difficulty,repeats,maxAttempts,helper}` |
 | `game:secret-submit` | `{gameId,colors:number[]}` |
 | `game:guess-submit` | `{gameId,round,colors:number[]}` |
 | `game:state-sync` | `{roomCode,playerId,token}` |

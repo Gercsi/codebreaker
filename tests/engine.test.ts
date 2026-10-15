@@ -1,8 +1,9 @@
+import {helperKnowledge,feedbackLabel} from '../shared/helper.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Engine} from '../server/engine.js';
-import {evaluate,validateCode} from '../server/scoring.js';
-const settings={difficulty:'normal' as const,repeats:true,maxAttempts:10};
+import {evaluate,evaluateDetailed,validateCode} from '../server/scoring.js';
+const settings={difficulty:'normal' as const,repeats:true,maxAttempts:10,helper:false};
 test('értékelés: pontos, részleges, nulla és duplikált találatok',()=>{
  const cases:[number[],number[],number,number][]=[
   [[0,1,2,3,4],[0,1,2,3,4],5,0],[[0,0,0,0,0],[1,1,1,1,1],0,0],
@@ -73,4 +74,56 @@ test('titkos kód zárolása és feladás',()=>{
 });
 test('sikertelen lemezmentés nem módosítja a hiteles állapotot',()=>{
  const e=new Engine();const a=e.create('Anna');e.save=()=>{throw new Error('disk full');};assert.throws(()=>e.configure(a.room.code,a.session.playerId,{...settings,difficulty:'hard'}));assert.equal(e.get(a.room.code).settings.difficulty,'normal');
+});
+
+test('segítő értékelés: pontos találat elsőbbsége, többlet és kizárt szín',()=>{
+ const colors=[0,0,0,2,7],result=evaluateDetailed([1,0,1,2,3],colors);
+ assert.deepEqual(result.feedback,['miss','exact','miss','exact','miss']);
+ const guess={round:1,colors,...result},knowledge=helperKnowledge([guess],5,8);
+ assert.equal(feedbackLabel(guess,0),'Többlet');assert.equal(feedbackLabel(guess,4),'Nincs benne');
+ assert.equal(knowledge.absent[0],false);assert.equal(knowledge.absent[7],true);
+ assert.deepEqual(knowledge.fixed,[null,0,null,2,null]);assert.equal(knowledge.minimum[0],1);
+});
+
+test('segítő kimerítő ellenőrzés: minden jel és következtetés igaz a 6561 kódpárra',()=>{
+ const codes=Array.from({length:81},(_,n)=>Array.from({length:4},(_,i)=>Math.floor(n/3**i)%3));
+ for(const secret of codes)for(const colors of codes){
+  const result=evaluateDetailed(secret,colors),knowledge=helperKnowledge([{round:1,colors,...result}],4,3);
+  result.feedback.forEach((f,i)=>{assert.equal(f==='exact',secret[i]===colors[i]);if(f==='partial')assert.ok(secret.includes(colors[i]));});
+  for(let c=0;c<3;c++){
+   const actual=secret.filter(v=>v===c).length,matched=result.feedback.filter((f,i)=>colors[i]===c&&f!=='miss').length;
+   assert.equal(matched,Math.min(actual,colors.filter(v=>v===c).length));
+   assert.ok(knowledge.minimum[c]<=actual);if(knowledge.absent[c])assert.equal(actual,0);
+  }
+  knowledge.fixed.forEach((c,i)=>{if(c!==null)assert.equal(c,secret[i]);});
+ }
+});
+
+test('segítő beállítás: közös, csak host, zárolt és régi szobákkal kompatibilis',()=>{
+ const e=new Engine(),a=e.create('Anna'),code=a.room.code,b=e.join(code,'Bence');
+ assert.equal(e.get(code).settings.helper,false);
+ assert.throws(()=>e.configure(code,b.session.playerId,{...settings,helper:true}));
+ for(const invalid of [null,1,'true',{},[]])assert.throws(()=>e.configure(code,a.session.playerId,{...settings,helper:invalid as any}));
+ const legacy={...settings};delete (legacy as Partial<typeof legacy>).helper;
+ e.configure(code,a.session.playerId,legacy);assert.equal(e.get(code).settings.helper,false);
+ delete (e.get(code).settings as Partial<typeof settings>).helper;
+ assert.equal(e.view(e.get(code),a.session.playerId).settings.helper,false);
+ e.configure(code,a.session.playerId,{...settings,helper:true});assert.equal(e.view(e.get(code),b.session.playerId).settings.helper,true);
+ e.start(code,a.session.playerId);assert.throws(()=>e.configure(code,a.session.playerId,settings));
+ const id=e.get(code).gameId;e.secret(code,a.session.playerId,id,[0,1,2,3,4]);e.secret(code,b.session.playerId,id,[4,3,2,1,0]);
+ const r=e.guess(code,a.session.playerId,id,1,[4,2,6,6,6]);
+ assert.deepEqual(e.view(r,a.session.playerId).guesses[0].feedback,['exact','partial','miss','miss','miss']);
+ assert.deepEqual(e.view(r,b.session.playerId).guesses,[]);assert.equal(e.view(r,a.session.playerId).reveal,null);
+ e.leave(code,a.session.playerId);e.reconnect(a.session);e.rematch(code,a.session.playerId);e.rematch(code,b.session.playerId);
+ assert.equal(e.get(code).settings.helper,true);assert.deepEqual(helperKnowledge(e.view(e.get(code),a.session.playerId).guesses,5,8).fixed,[null,null,null,null,null]);
+ const classic=pair();classic.engine.guess(classic.code,classic.a.playerId,classic.id,1,[4,2,6,6,6]);
+ assert.ok(!Object.hasOwn(classic.engine.view(classic.engine.get(classic.code),classic.a.playerId).guesses[0],'feedback'));
+});
+
+test('segítő tudás több körből: a darabszám maximum, a fix helyek összeadódnak',()=>{
+ const secret=[0,0,1,2,3],colorsA=[0,1,0,7,7],colorsB=[0,0,7,2,7];
+ const guesses=[{round:1,colors:colorsA,...evaluateDetailed(secret,colorsA)},{round:2,colors:colorsB,...evaluateDetailed(secret,colorsB)}];
+ const k=helperKnowledge(guesses,5,8);assert.equal(k.minimum[0],2);assert.equal(k.minimum[1],1);
+ assert.deepEqual(k.fixed,[0,0,null,2,null]);assert.equal(k.absent[7],true);
+ assert.deepEqual(helperKnowledge([{round:1,colors:secret,exact:5,partial:0}],5,8).fixed,[null,null,null,null,null]);
 });

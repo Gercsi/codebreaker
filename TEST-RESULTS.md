@@ -1,3 +1,16 @@
+## Segítő mód frissítés – 2026. október 15.
+
+- Build: sikeres TypeScript/Vite/frontend/backend fordítás.
+- Motor és Socket.IO: 18/18 teszt sikeres. A pozíciónkénti értékelés és az abból levont nyomok további 6561 kódpáron ellenőrizve.
+- Böngésző: 5/5 Playwright forgatókönyv sikeres. A segítő felület CSS-javítása után mindkét érintett forgatókönyv ismét sikeres.
+- Segítő mód: csak a házigazda állíthatja, indulás után zárolt; mindkét játékos látja a beállítást. Alapértelmezésben kikapcsolt, a korábbi adatbázis kompatibilis.
+- A saját részletes értékelés csak a beküldőhöz jut el. A klasszikus módban a szerver nem küldi a pozíciónkénti jelzéseket.
+- Ismétlődő színek, pontos találatok elsőbbsége, többletpéldányok, biztosan kizárt színek és több kör nyomai ellenőrizve.
+- Automatikus kitöltés, fix pozíciók zárolása, fix helyeket megőrző törlés, nem ismétlődő színek védelme és a következő üres hely kiválasztása működik.
+- Böngészőfrissítés és SQLite-os szerver-újraindítás után megmaradnak a nyomok; visszavágónál a beállítás megmarad, a nyomok törlődnek.
+- 375 px mobil és 1440 px asztali segítő felület szemrevételezve. Nincs vízszintes túlcsordulás, a fix helyek nem fedik egymást. Nincs JavaScript oldalhiba.
+
+Az alábbi rész az eredeti MVP ellenőrzési jegyzőkönyve; a fenti eredmények a frissített verzióra vonatkoznak.
 # Ellenőrzési jegyzőkönyv
 
 Dátum: 2026. október 15. Környezet: Windows, Node.js 18.20.7, npm 10.8.2, telepített Microsoft Edge headless böngésző.

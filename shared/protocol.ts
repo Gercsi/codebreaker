@@ -6,10 +6,11 @@ export const COLORS = [
 ] as const;
 export const DIFFICULTIES = {easy:{label:'Könnyű',length:4,colors:6},normal:{label:'Normál',length:5,colors:8},hard:{label:'Nehéz',length:6,colors:8}} as const;
 export type Difficulty = keyof typeof DIFFICULTIES;
-export interface Settings {difficulty:Difficulty; repeats:boolean; maxAttempts:number}
+export interface Settings {difficulty:Difficulty; repeats:boolean; maxAttempts:number; helper:boolean}
 export type Status = 'WAITING'|'SETUP'|'PLAYING'|'FINISHED'|'CLOSED';
 export interface Score {exact:number; partial:number}
-export interface Guess extends Score {round:number; colors:number[]}
+export type PegFeedback = 'exact'|'partial'|'miss';
+export interface Guess extends Score {round:number; colors:number[]; feedback?:PegFeedback[]}
 export interface PublicPlayer {id:string; nickname:string; connected:boolean; ready:boolean; submitted:boolean; rematch:boolean; reconnectUntil:number|null}
 export interface RoomView {
  code:string; gameId:string; hostId:string; meId:string; status:Status; settings:Settings;
